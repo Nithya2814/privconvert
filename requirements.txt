@@ -6,3 +6,4 @@ python-docx
 reportlab
 python-pptx
 cryptography
+pymupdf
