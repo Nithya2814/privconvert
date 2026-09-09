@@ -1,0 +1,8 @@
+streamlit
+pillow
+pypdf
+pdf2docx
+python-docx
+reportlab
+python-pptx
+cryptography
