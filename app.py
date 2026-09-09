@@ -68,16 +68,6 @@ st.markdown("""
         background: linear-gradient(90deg, #DB2777, #F43F5E);
         color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-block;
     }
-    
-    /* Card Styles */
-    .feature-box {
-        background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
-        border: 1px solid #334155;
-        border-radius: 12px;
-        padding: 18px;
-        margin-bottom: 15px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -136,7 +126,7 @@ def add_watermark(image: Image.Image, text: str) -> Image.Image:
     w, h = watermarked.size
     for x in range(0, w, font_size * 6):
         for y in range(0, h, font_size * 4):
-            draw.text((x, y), text, fill=(244, 63, 94, 80), font=font)
+            draw.text((x, y), text, fill=(220, 38, 38, 80), font=font)
     combined = Image.alpha_composite(watermarked, txt_layer)
     return combined.convert("RGB")
 
@@ -477,12 +467,38 @@ with tab4:
             
     with col_b:
         st.markdown("#### 2. Live PII Masking Engine")
-        st.write("Test our on-device privacy filter that automatically scrubs personal identity info:")
+        st.write("Type or paste document text with phone, email, or Aadhaar numbers to mask and download:")
         sample_in = st.text_area(
             "Enter Document Text:",
-            "Invoice for Customer Rajesh, Phone: +91 9876543210, Email: rajesh@example.com, Aadhaar: 9876 5432 1098"
+            "Phone: +91 9790611283 , Aadhaar: 5445 5020 4394",
+            height=100
         )
-        if st.button("🛡️ Redact Personal Information"):
+        if st.button("🛡️ Redact Personal Information", type="primary"):
             cleaned = redact_sensitive_text(sample_in)
-            st.success("✅ Masked Content:")
+            st.success("✅ Sensitive Data Masked Successfully!")
             st.code(cleaned, language="text")
+            
+            # Direct Download options!
+            st.markdown("##### ⬇️ Download Your Redacted Document:")
+            d_col1, d_col2 = st.columns(2)
+            with d_col1:
+                # PDF Download of masked text
+                pdf_buf = io.BytesIO()
+                doc_t = SimpleDocTemplate(pdf_buf, pagesize=letter, margin=40)
+                styles = getSampleStyleSheet()
+                lines = cleaned.split("\n")
+                story = [Paragraph(html.escape(l), styles["Normal"]) if l.strip() else Spacer(1, 6) for l in lines]
+                doc_t.build(story)
+                st.download_button(
+                    label="📄 Download as Masked PDF",
+                    data=pdf_buf.getvalue(),
+                    file_name="masked_document.pdf",
+                    mime="application/pdf"
+                )
+            with d_col2:
+                st.download_button(
+                    label="📋 Download as Masked Text (.txt)",
+                    data=cleaned,
+                    file_name="masked_document.txt",
+                    mime="text/plain"
+                )
