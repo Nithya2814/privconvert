@@ -4,74 +4,103 @@ import io
 import re
 import hashlib
 import tempfile
+import html
 from PIL import Image, ImageDraw, ImageFont
 import pymupdf  # PyMuPDF
 from pypdf import PdfReader, PdfWriter
 from pdf2docx import Converter
 from docx import Document
 from pptx import Presentation
-from pptx.util import Inches, Pt
+from pptx.util import Inches
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
-import html
 
-# Page Setup
+# Page Configuration
 st.set_page_config(
-    page_title="PrivConvert Pro - Zero-Trust Document Studio",
-    page_icon="🛡️",
+    page_title="PrivConvert Studio - Zero-Knowledge Converter",
+    page_icon="✨",
     layout="wide"
 )
 
-# Custom UI Styling
+# Colorful Modern CSS
 st.markdown("""
 <style>
-    .main-title {
-        font-size: 2.2rem;
-        font-weight: 800;
-        background: -webkit-linear-gradient(45deg, #3B82F6, #10B981);
+    /* Gradient Hero Header */
+    .hero-container {
+        background: linear-gradient(135deg, #1E1B4B 0%, #312E81 40%, #0F172A 100%);
+        border: 2px solid #6366F1;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 25px;
+        box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.3);
+    }
+    .hero-title {
+        font-size: 2.6rem;
+        font-weight: 900;
+        background: linear-gradient(90deg, #38BDF8, #818CF8, #F472B6);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: 0px;
+        margin: 0;
     }
-    .sub-title {
-        color: #94A3B8;
-        font-size: 1rem;
-        margin-top: -5px;
-        margin-bottom: 20px;
+    .hero-subtitle {
+        color: #E2E8F0;
+        font-size: 1.1rem;
+        font-weight: 500;
+        margin-top: 6px;
     }
-    .feature-card {
-        background-color: #1E293B;
+    
+    /* Colorful Feature Badges */
+    .pill-blue {
+        background: linear-gradient(90deg, #0284C7, #0EA5E9);
+        color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-block; margin-right: 8px;
+    }
+    .pill-purple {
+        background: linear-gradient(90deg, #7C3AED, #A855F7);
+        color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-block; margin-right: 8px;
+    }
+    .pill-emerald {
+        background: linear-gradient(90deg, #059669, #10B981);
+        color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-block; margin-right: 8px;
+    }
+    .pill-pink {
+        background: linear-gradient(90deg, #DB2777, #F43F5E);
+        color: white; padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: inline-block;
+    }
+    
+    /* Card Styles */
+    .feature-box {
+        background: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
         border: 1px solid #334155;
-        border-radius: 10px;
-        padding: 16px;
-        margin-bottom: 12px;
-    }
-    .security-badge {
-        display: inline-block;
-        background-color: #064E3B;
-        color: #34D399;
-        padding: 4px 10px;
-        border-radius: 6px;
-        font-size: 0.82rem;
-        font-weight: 600;
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 15px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Header
-st.markdown('<div class="main-title">🛡️ PrivConvert Pro</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-title">Zero-Knowledge Local Document Suite | 100% In-Memory Execution</div>', unsafe_allow_html=True)
+# Hero Header
+st.markdown("""
+<div class="hero-container">
+    <div class="hero-title">🛡️ PrivConvert Studio</div>
+    <div class="hero-subtitle">The Complete All-In-One Privacy-First Document & Media Conversion Suite</div>
+    <div style="margin-top: 15px;">
+        <span class="pill-blue">⚡ 100% In-Memory RAM</span>
+        <span class="pill-purple">🔒 AES-256 Military Lock</span>
+        <span class="pill-emerald">🚫 Zero Cloud Databases</span>
+        <span class="pill-pink">🛡️ Tamper-Proof SHA-256</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-# ----------------- Cryptographic & Conversion Helpers -----------------
+# ----------------- Helper Functions -----------------
 
 def calculate_sha256(data: bytes) -> str:
-    """Computes SHA-256 digital fingerprint to verify document integrity."""
     return hashlib.sha256(data).hexdigest()
 
 def apply_pdf_password(pdf_bytes: bytes, password: str) -> bytes:
-    """Applies native AES-256 encryption to a PDF document."""
     if not password:
         return pdf_bytes
     reader = PdfReader(io.BytesIO(pdf_bytes))
@@ -83,8 +112,18 @@ def apply_pdf_password(pdf_bytes: bytes, password: str) -> bytes:
     writer.write(out)
     return out.getvalue()
 
-def add_watermark_to_image(image: Image.Image, text: str) -> Image.Image:
-    """Adds a semi-transparent repeating diagonal security watermark."""
+def unlock_pdf(pdf_bytes: bytes, password: str) -> bytes:
+    reader = PdfReader(io.BytesIO(pdf_bytes))
+    if reader.is_encrypted:
+        reader.decrypt(password)
+    writer = PdfWriter()
+    for page in reader.pages:
+        writer.add_page(page)
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+def add_watermark(image: Image.Image, text: str) -> Image.Image:
     watermarked = image.copy().convert("RGBA")
     txt_layer = Image.new("RGBA", watermarked.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(txt_layer)
@@ -97,44 +136,34 @@ def add_watermark_to_image(image: Image.Image, text: str) -> Image.Image:
     w, h = watermarked.size
     for x in range(0, w, font_size * 6):
         for y in range(0, h, font_size * 4):
-            draw.text((x, y), text, fill=(220, 38, 38, 70), font=font)
-            
+            draw.text((x, y), text, fill=(244, 63, 94, 80), font=font)
     combined = Image.alpha_composite(watermarked, txt_layer)
     return combined.convert("RGB")
 
 def redact_sensitive_text(text: str) -> str:
-    """Auto-masks sensitive PII: Phone numbers, emails, and Aadhaar-style numbers."""
-    # Mask emails
     text = re.sub(r'[\w\.-]+@[\w\.-]+\.\w+', '[REDACTED_EMAIL]', text)
-    # Mask Indian phone numbers (10 digits with optional +91)
     text = re.sub(r'(\+91[\-\s]?)?[6-9]\d{9}', '[REDACTED_PHONE]', text)
-    # Mask 12-digit Aadhaar pattern
     text = re.sub(r'\b\d{4}\s\d{4}\s\d{4}\b', '[REDACTED_AADHAAR]', text)
     return text
 
-def convert_docx_to_pdf_formatted(docx_file, redact: bool = False) -> bytes:
-    """High-fidelity Word to PDF conversion preserving bold, italics, tables & structure."""
+def convert_docx_to_pdf(docx_file, redact: bool = False) -> bytes:
     doc = Document(docx_file)
     pdf_buffer = io.BytesIO()
     doc_template = SimpleDocTemplate(pdf_buffer, pagesize=letter, rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40)
     styles = getSampleStyleSheet()
     
-    # Custom paragraph styles
     body_style = styles["Normal"]
     body_style.fontSize = 11
     body_style.leading = 14
     
     h1_style = styles["Heading1"]
-    h1_style.fontSize = 18
+    h1_style.fontSize = 17
     h1_style.leading = 22
-    h1_style.spaceAfter = 10
+    h1_style.textColor = colors.HexColor('#4F46E5')
     
     story = []
-    
-    # Iterate through paragraphs and tables
     for element in doc.element.body:
         if element.tag.endswith('p'):
-            # It's a paragraph
             p = [p for p in doc.paragraphs if p._element == element]
             if p:
                 para = p[0]
@@ -161,7 +190,6 @@ def convert_docx_to_pdf_formatted(docx_file, redact: bool = False) -> bytes:
                     story.append(Spacer(1, 6))
                     
         elif element.tag.endswith('tbl'):
-            # It's a table
             t = [t for t in doc.tables if t._element == element]
             if t:
                 tbl = t[0]
@@ -177,58 +205,44 @@ def convert_docx_to_pdf_formatted(docx_file, redact: bool = False) -> bytes:
                 if tbl_data:
                     pdf_tbl = Table(tbl_data)
                     pdf_tbl.setStyle(TableStyle([
-                        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#F1F5F9')),
-                        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E1')),
-                        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-                        ('TOPPADDING', (0,0), (-1,-1), 6),
-                        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+                        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#EEF2FF')),
+                        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#C7D2FE')),
+                        ('TOPPADDING', (0,0), (-1,-1), 5),
+                        ('BOTTOMPADDING', (0,0), (-1,-1), 5),
                     ]))
                     story.append(pdf_tbl)
                     story.append(Spacer(1, 10))
                     
     if not story:
         story.append(Paragraph("Empty Document", body_style))
-        
     doc_template.build(story)
     return pdf_buffer.getvalue()
 
 def convert_pdf_to_pptx(pdf_file) -> bytes:
-    """Converts each PDF page into high-resolution PowerPoint presentation slides."""
-    pdf_bytes = pdf_file.read()
-    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+    doc = pymupdf.open(stream=pdf_file.read(), filetype="pdf")
     prs = Presentation()
-    
-    # Standard 16:9 widescreen or PDF ratio
     prs.slide_width = Inches(10)
     prs.slide_height = Inches(7.5)
-    blank_layout = prs.slide_layouts[6]  # Blank layout
-    
+    blank_layout = prs.slide_layouts[6]
     for page in doc:
-        # Render page at 150 DPI for crisp slide display
         pix = page.get_pixmap(dpi=150)
         img_bytes = pix.tobytes("png")
-        
         slide = prs.slides.add_slide(blank_layout)
-        img_stream = io.BytesIO(img_bytes)
-        slide.shapes.add_picture(img_stream, 0, 0, width=prs.slide_width, height=prs.slide_height)
-        
+        slide.shapes.add_picture(io.BytesIO(img_bytes), 0, 0, width=prs.slide_width, height=prs.slide_height)
     out_pptx = io.BytesIO()
     prs.save(out_pptx)
     return out_pptx.getvalue()
 
 def convert_pptx_to_pdf(pptx_file) -> bytes:
-    """Converts PowerPoint presentation text and slide notes into a structured PDF."""
     prs = Presentation(pptx_file)
     pdf_buffer = io.BytesIO()
     doc_template = SimpleDocTemplate(pdf_buffer, pagesize=letter, margin=40)
     styles = getSampleStyleSheet()
     story = []
-    
     for idx, slide in enumerate(prs.slides):
         story.append(Paragraph(f"<b>Slide {idx + 1}</b>", styles["Heading2"]))
         story.append(Spacer(1, 6))
-        
-        slide_text_found = False
+        text_found = False
         for shape in slide.shapes:
             if shape.has_text_frame:
                 for para in shape.text_frame.paragraphs:
@@ -236,188 +250,239 @@ def convert_pptx_to_pdf(pptx_file) -> bytes:
                     if t:
                         story.append(Paragraph(t, styles["Normal"]))
                         story.append(Spacer(1, 4))
-                        slide_text_found = True
-                        
-        if not slide_text_found:
+                        text_found = True
+        if not text_found:
             story.append(Paragraph("<i>[Visual or Media Slide]</i>", styles["Normal"]))
-        story.append(Spacer(1, 16))
-        
+        story.append(Spacer(1, 14))
     doc_template.build(story)
     return pdf_buffer.getvalue()
 
-# ----------------- MAIN UI TABS -----------------
-tab_doc, tab_media, tab_privacy = st.tabs([
-    "📑 Document Studio (PDF, Word, PPT)", 
-    "🖼️ Image & Media Studio",
-    "🛡️ Privacy Shield & Verification"
+# ----------------- MAIN TABS -----------------
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📑 Office & Documents", 
+    "🖼️ Images & Media Studio", 
+    "🔓 PDF Unlocker & Decryptor",
+    "🛡️ Privacy Shield (Redaction & Hash)"
 ])
 
-# ----------------- TAB 1: Document Studio -----------------
-with tab_doc:
-    st.markdown("### Document Conversion Engine")
+# ----------------- TAB 1: Office & Documents -----------------
+with tab1:
+    st.markdown("### 📑 Document Conversions (Word, PDF, PPT, Text)")
     
-    conv_mode = st.selectbox(
-        "Choose Conversion Action:",
+    doc_option = st.selectbox(
+        "Select Your Conversion:",
         [
-            "📄 PDF ➔ Word (.docx) [Editable Layout]",
-            "📝 Word (.docx) ➔ PDF [Preserve Styles & Tables]",
+            "📄 PDF ➔ Word (.docx) [Fully Editable Layout & Tables]",
+            "📝 Word (.docx) ➔ PDF [Preserves Formatting, Fonts & Tables]",
             "📊 PDF ➔ PowerPoint (.pptx) [Pixel-Perfect Slides]",
-            "🖥️ PowerPoint (.pptx) ➔ PDF"
+            "🖥️ PowerPoint (.pptx) ➔ PDF",
+            "📋 PDF ➔ Plain Text (.txt)",
+            "✍️ Plain Text (.txt) ➔ PDF"
         ]
     )
     
-    if "PDF ➔ Word" in conv_mode:
-        uploaded_pdf = st.file_uploader("Upload PDF file:", type=["pdf"], key="pdf_docx_up")
-        if uploaded_pdf:
-            if st.button("🔄 Convert to Editable Word Document", type="primary"):
-                with st.spinner("Reconstructing formatting locally..."):
+    if "PDF ➔ Word" in doc_option:
+        up_pdf = st.file_uploader("Upload PDF:", type=["pdf"], key="pdf_w_in")
+        if up_pdf:
+            if st.button("✨ Convert to Word (.docx)", type="primary"):
+                with st.spinner("Extracting layout, fonts & tables locally..."):
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_in:
-                        tmp_in.write(uploaded_pdf.read())
+                        tmp_in.write(up_pdf.read())
                         tmp_in_path = tmp_in.name
-                    tmp_out_path = tmp_in_path.replace(".pdf", ".docx")
-                    
+                    tmp_out = tmp_in_path.replace(".pdf", ".docx")
                     cv = Converter(tmp_in_path)
-                    cv.convert(tmp_out_path)
+                    cv.convert(tmp_out)
                     cv.close()
-                    
-                    with open(tmp_out_path, "rb") as f:
-                        docx_data = f.read()
+                    with open(tmp_out, "rb") as f:
+                        data = f.read()
                     os.remove(tmp_in_path)
-                    os.remove(tmp_out_path)
-                    
-                    name = f"{os.path.splitext(uploaded_pdf.name)[0]}.docx"
-                    st.success("✅ Converted with fonts, tables, and alignments preserved!")
-                    st.download_button(f"⬇️ Download {name}", data=docx_data, file_name=name)
+                    os.remove(tmp_out)
+                    name = f"{os.path.splitext(up_pdf.name)[0]}.docx"
+                    st.success("🎉 Converted successfully!")
+                    st.download_button(f"⬇️ Download {name}", data=data, file_name=name)
 
-    elif "Word (.docx) ➔ PDF" in conv_mode:
-        uploaded_docx = st.file_uploader("Upload Word Document (.docx):", type=["docx"], key="docx_pdf_up")
-        if uploaded_docx:
-            col_w1, col_w2 = st.columns(2)
-            with col_w1:
-                lock_docx_pdf = st.checkbox("🔒 Native AES-256 Password Lock", value=False)
-                docx_pass = st.text_input("Set Password (Optional):", type="password", key="docx_p_key") if lock_docx_pdf else ""
-            with col_w2:
-                redact_option = st.checkbox("🛡️ Auto-Redact Sensitive Data (Phone, Email, Aadhaar)", value=False)
-                
-            if st.button("🚀 Convert to PDF", type="primary"):
-                with st.spinner("Compiling styled PDF in local memory..."):
-                    raw_pdf = convert_docx_to_pdf_formatted(uploaded_docx, redact=redact_option)
-                    final_pdf = apply_pdf_password(raw_pdf, docx_pass if lock_docx_pdf else None)
-                    
-                    name = f"{os.path.splitext(uploaded_docx.name)[0]}.pdf"
-                    st.success("✅ Successfully generated PDF with preserved styling!")
-                    st.download_button(f"⬇️ Download {name}", data=final_pdf, file_name=name, mime="application/pdf")
-
-    elif "PDF ➔ PowerPoint" in conv_mode:
-        uploaded_pdf_ppt = st.file_uploader("Upload PDF to turn into Slides:", type=["pdf"], key="pdf_ppt_up")
-        if uploaded_pdf_ppt:
-            if st.button("📊 Convert PDF to PowerPoint Slides", type="primary"):
-                with st.spinner("Rendering high-resolution slides locally..."):
-                    pptx_data = convert_pdf_to_pptx(uploaded_pdf_ppt)
-                    name = f"{os.path.splitext(uploaded_pdf_ppt.name)[0]}.pptx"
-                    st.success("✅ Slides generated! Open and present directly in PowerPoint.")
-                    st.download_button(f"⬇️ Download {name}", data=pptx_data, file_name=name)
-
-    elif "PowerPoint (.pptx) ➔ PDF" in conv_mode:
-        uploaded_pptx = st.file_uploader("Upload PowerPoint Presentation (.pptx):", type=["pptx"], key="pptx_pdf_up")
-        if uploaded_pptx:
-            lock_ppt_pdf = st.checkbox("🔒 Protect Output PDF with Password", value=False, key="ppt_lock")
-            ppt_pass = st.text_input("Set Password:", type="password", key="ppt_p_key") if lock_ppt_pdf else ""
-            if st.button("🚀 Convert Presentation to PDF", type="primary"):
-                with st.spinner("Converting slides to document..."):
-                    raw_pdf = convert_pptx_to_pdf(uploaded_pptx)
-                    final_pdf = apply_pdf_password(raw_pdf, ppt_pass if lock_ppt_pdf else None)
-                    name = f"{os.path.splitext(uploaded_pptx.name)[0]}.pdf"
-                    st.success("✅ Converted to PDF!")
-                    st.download_button(f"⬇️ Download {name}", data=final_pdf, file_name=name, mime="application/pdf")
-
-# ----------------- TAB 2: Media Studio -----------------
-with tab_media:
-    st.markdown("### Images & Media Converter")
-    media_mode = st.radio("Select Action:", ["Images ➔ Secure PDF", "PDF ➔ Extract Images (PNG)", "Image Format Converter (PNG/JPG/WEBP)"], horizontal=True)
-    
-    if media_mode == "Images ➔ Secure PDF":
-        img_upload = st.file_uploader("Upload Image:", type=["png", "jpg", "jpeg", "webp"], key="img_sec_up")
-        if img_upload:
+    elif "Word (.docx) ➔ PDF" in doc_option:
+        up_docx = st.file_uploader("Upload Word (.docx):", type=["docx"], key="docx_pdf_in")
+        if up_docx:
             c1, c2 = st.columns(2)
             with c1:
-                img_obj = Image.open(img_upload)
-                st.image(img_obj, width=300)
+                pw_docx = st.checkbox("🔒 Native AES-256 Password Protection", value=False)
+                docx_pw = st.text_input("Set Password:", type="password", key="pw_d_val") if pw_docx else ""
             with c2:
-                enable_lock = st.checkbox("🔒 Native PDF Password Lock", value=True)
-                pass_val = st.text_input("PDF Open Password:", type="password") if enable_lock else ""
+                auto_red = st.checkbox("🛡️ Auto-Redact Sensitive PII (Phone, Email, Aadhaar)", value=False)
                 
-                enable_wm = st.checkbox("🛡️ Add Anti-Leak Watermark", value=False)
-                wm_text = st.text_input("Watermark:", "CONFIDENTIAL - VERIFICATION ONLY") if enable_wm else ""
+            if st.button("🚀 Convert to Formatted PDF", type="primary"):
+                with st.spinner("Compiling styled PDF in RAM..."):
+                    pdf_bytes = convert_docx_to_pdf(up_docx, redact=auto_red)
+                    final_pdf = apply_pdf_password(pdf_bytes, docx_pw if pw_docx else None)
+                    name = f"{os.path.splitext(up_docx.name)[0]}.pdf"
+                    st.success("🎉 PDF generated with preserved styles!")
+                    st.download_button(f"⬇️ Download {name}", data=final_pdf, file_name=name, mime="application/pdf")
+
+    elif "PDF ➔ PowerPoint" in doc_option:
+        up_pdf_ppt = st.file_uploader("Upload PDF to convert to Slides:", type=["pdf"], key="pdf_ppt_in")
+        if up_pdf_ppt:
+            if st.button("📊 Convert to PowerPoint (.pptx)", type="primary"):
+                with st.spinner("Generating presentation slides..."):
+                    pptx_bytes = convert_pdf_to_pptx(up_pdf_ppt)
+                    name = f"{os.path.splitext(up_pdf_ppt.name)[0]}.pptx"
+                    st.success("🎉 Presentation slides created! Open directly in PowerPoint.")
+                    st.download_button(f"⬇️ Download {name}", data=pptx_bytes, file_name=name)
+
+    elif "PowerPoint (.pptx) ➔ PDF" in doc_option:
+        up_ppt = st.file_uploader("Upload PowerPoint (.pptx):", type=["pptx"], key="ppt_pdf_in")
+        if up_ppt:
+            ppt_pw_chk = st.checkbox("🔒 Lock PDF with Password", value=False, key="ppt_pw_chk")
+            ppt_pw = st.text_input("Enter Password:", type="password", key="ppt_pw_val") if ppt_pw_chk else ""
+            if st.button("🚀 Convert PPT to PDF", type="primary"):
+                with st.spinner("Converting slides..."):
+                    pdf_b = convert_pptx_to_pdf(up_ppt)
+                    final_b = apply_pdf_password(pdf_b, ppt_pw if ppt_pw_chk else None)
+                    name = f"{os.path.splitext(up_ppt.name)[0]}.pdf"
+                    st.success("🎉 Converted to PDF!")
+                    st.download_button(f"⬇️ Download {name}", data=final_b, file_name=name, mime="application/pdf")
+
+    elif "PDF ➔ Plain Text" in doc_option:
+        up_pdf_txt = st.file_uploader("Upload PDF to extract text:", type=["pdf"], key="pdf_txt_in")
+        if up_pdf_txt:
+            if st.button("📋 Extract Text"):
+                doc = pymupdf.open(stream=up_pdf_txt.read(), filetype="pdf")
+                full_text = "\n\n".join([f"--- Page {i+1} ---\n" + page.get_text() for i, page in enumerate(doc)])
+                st.text_area("Extracted Text Preview:", full_text[:2000] + "...", height=200)
+                st.download_button("⬇️ Download Text File (.txt)", data=full_text, file_name=f"{os.path.splitext(up_pdf_txt.name)[0]}.txt")
+
+    elif "Plain Text (.txt) ➔ PDF" in doc_option:
+        up_txt = st.file_uploader("Upload Text File (.txt):", type=["txt"], key="txt_pdf_in")
+        if up_txt:
+            txt_pw_chk = st.checkbox("🔒 Lock PDF with Password", value=False, key="txt_pw_chk")
+            txt_pw = st.text_input("Enter Password:", type="password", key="txt_pw_val") if txt_pw_chk else ""
+            if st.button("🚀 Convert Text to PDF", type="primary"):
+                buf = io.BytesIO()
+                doc_t = SimpleDocTemplate(buf, pagesize=letter, margin=40)
+                styles = getSampleStyleSheet()
+                lines = up_txt.read().decode("utf-8", errors="ignore").split("\n")
+                story = [Paragraph(html.escape(l), styles["Normal"]) if l.strip() else Spacer(1, 6) for l in lines]
+                doc_t.build(story)
+                final_txt_pdf = apply_pdf_password(buf.getvalue(), txt_pw if txt_pw_chk else None)
+                st.success("🎉 Converted to PDF!")
+                st.download_button("⬇️ Download PDF", data=final_txt_pdf, file_name=f"{os.path.splitext(up_txt.name)[0]}.pdf", mime="application/pdf")
+
+# ----------------- TAB 2: Images & Media Studio -----------------
+with tab2:
+    st.markdown("### 🖼️ Images & Media Studio")
+    media_action = st.radio(
+        "Choose Action:", 
+        ["📸 Images ➔ Password-Protected PDF", "🖼️ PDF ➔ Extract Pages as PNG", "🎨 Image Format Converter (PNG/JPG/WEBP)"],
+        horizontal=True
+    )
+    
+    if media_action == "📸 Images ➔ Password-Protected PDF":
+        img_in = st.file_uploader("Upload Image (PNG, JPG, WEBP):", type=["png", "jpg", "jpeg", "webp"], key="img_pdf_in")
+        if img_in:
+            col1, col2 = st.columns(2)
+            with col1:
+                im = Image.open(img_in)
+                st.image(im, width=320, caption=f"Selected: {img_in.name}")
+            with col2:
+                enable_lock = st.checkbox("🔒 Native PDF Password Lock", value=True, key="img_pw_on")
+                img_pwd = st.text_input("Enter Secret Password:", type="password", key="img_pw_val") if enable_lock else ""
                 
-                if st.button("🚀 Create Secure PDF", type="primary"):
-                    if enable_lock and not pass_val:
+                enable_wm = st.checkbox("🛡️ Add Anti-Leak Watermark", value=False, key="img_wm_on")
+                wm_val = st.text_input("Watermark Text:", value="CONFIDENTIAL - FOR VERIFICATION ONLY") if enable_wm else ""
+                
+                if st.button("🚀 Generate PDF", type="primary"):
+                    if enable_lock and not img_pwd:
                         st.error("Please enter a password!")
                     else:
-                        img_to_proc = img_obj
-                        if enable_wm and wm_text:
-                            img_to_proc = add_watermark_to_image(img_to_proc, wm_text)
-                        elif img_to_proc.mode in ("RGBA", "P"):
-                            img_to_proc = img_to_proc.convert("RGB")
-                            
-                        buf = io.BytesIO()
-                        img_to_proc.save(buf, format="PDF")
-                        final_pdf = apply_pdf_password(buf.getvalue(), pass_val if enable_lock else None)
+                        proc_im = im
+                        if enable_wm and wm_val:
+                            proc_im = add_watermark(proc_im, wm_val)
+                        elif proc_im.mode in ("RGBA", "P"):
+                            proc_im = proc_im.convert("RGB")
                         
-                        out_name = f"{os.path.splitext(img_upload.name)[0]}.pdf"
-                        st.success("✅ Secure PDF Ready!")
-                        st.download_button(f"⬇️ Download {out_name}", data=final_pdf, file_name=out_name, mime="application/pdf")
+                        b = io.BytesIO()
+                        proc_im.save(b, format="PDF")
+                        final_p = apply_pdf_password(b.getvalue(), img_pwd if enable_lock else None)
+                        
+                        name = f"{os.path.splitext(img_in.name)[0]}.pdf"
+                        st.success("🎉 Secure PDF ready!")
+                        st.download_button(f"⬇️ Download {name}", data=final_p, file_name=name, mime="application/pdf")
 
-    elif media_mode == "PDF ➔ Extract Images (PNG)":
-        pdf_img_up = st.file_uploader("Upload PDF to extract pages:", type=["pdf"], key="pdf_extract_up")
-        if pdf_img_up:
-            if st.button("🖼️ Extract Pages as Crisp PNGs"):
-                doc = pymupdf.open(stream=pdf_img_up.read(), filetype="pdf")
-                st.write(f"Total Pages Found: **{len(doc)}**")
-                for i, page in enumerate(doc):
+    elif media_action == "🖼️ PDF ➔ Extract Pages as PNG":
+        pdf_pages_in = st.file_uploader("Upload PDF to extract pages:", type=["pdf"], key="pdf_pages_up")
+        if pdf_pages_in:
+            if st.button("✨ Extract All Pages as Images"):
+                doc = pymupdf.open(stream=pdf_pages_in.read(), filetype="pdf")
+                st.write(f"Total Pages: **{len(doc)}**")
+                cols = st.columns(min(3, len(doc)))
+                for idx, page in enumerate(doc):
                     pix = page.get_pixmap(dpi=150)
-                    png_bytes = pix.tobytes("png")
-                    st.image(png_bytes, caption=f"Page {i+1}", width=300)
-                    st.download_button(f"⬇️ Download Page {i+1} (PNG)", data=png_bytes, file_name=f"page_{i+1}.png", mime="image/png")
+                    png_b = pix.tobytes("png")
+                    with cols[idx % len(cols)]:
+                        st.image(png_b, caption=f"Page {idx+1}")
+                        st.download_button(f"⬇️ Page {idx+1} (PNG)", data=png_b, file_name=f"page_{idx+1}.png", mime="image/png")
 
-    elif media_mode == "Image Format Converter (PNG/JPG/WEBP)":
-        raw_img_up = st.file_uploader("Upload Image:", type=["png", "jpg", "jpeg", "webp"], key="raw_img_up")
-        if raw_img_up:
-            target_ext = st.selectbox("Convert To:", ["PNG", "JPEG", "WEBP"])
-            if st.button("🔄 Convert Format"):
-                im = Image.open(raw_img_up)
-                buf = io.BytesIO()
-                fmt = "JPEG" if target_ext == "JPEG" else target_ext
-                if fmt == "JPEG" and im.mode in ("RGBA", "P"):
-                    im = im.convert("RGB")
-                im.save(buf, format=fmt)
-                out_name = f"converted.{target_ext.lower()}"
-                st.success(f"✅ Converted to {target_ext}!")
-                st.download_button(f"⬇️ Download {out_name}", data=buf.getvalue(), file_name=out_name, mime=f"image/{target_ext.lower()}")
+    elif media_action == "🎨 Image Format Converter (PNG/JPG/WEBP)":
+        raw_img = st.file_uploader("Upload Image:", type=["png", "jpg", "jpeg", "webp"], key="raw_img_cov")
+        if raw_img:
+            target = st.selectbox("Convert To Format:", ["PNG", "JPEG", "WEBP"])
+            if st.button("🔄 Convert Image"):
+                img_obj = Image.open(raw_img)
+                b = io.BytesIO()
+                f = "JPEG" if target == "JPEG" else target
+                if f == "JPEG" and img_obj.mode in ("RGBA", "P"):
+                    img_obj = img_obj.convert("RGB")
+                img_obj.save(b, format=f)
+                ext = target.lower()
+                st.success(f"🎉 Converted to {target}!")
+                st.download_button(f"⬇️ Download .{ext}", data=b.getvalue(), file_name=f"converted.{ext}", mime=f"image/{ext}")
 
-# ----------------- TAB 3: Privacy Shield -----------------
-with tab_privacy:
-    st.markdown("### 🛡️ Competition Novelty & Privacy Engine")
-    st.info("These enterprise security modules run 100% on client-side RAM with zero external server dependencies.")
+# ----------------- TAB 3: PDF Unlocker & Decryptor -----------------
+with tab3:
+    st.markdown("### 🔓 PDF Password Unlocker")
+    st.write("Have a password-protected PDF? Unlock it locally so you can view/print it without repeatedly typing the password.")
     
-    col_p1, col_p2 = st.columns(2)
-    with col_p1:
-        st.markdown("#### 1. SHA-256 Tamper-Proof Fingerprint")
-        st.write("Upload any file to calculate its cryptographic fingerprint to ensure nobody modified it:")
-        check_file = st.file_uploader("File to verify:", key="hash_check_file")
-        if check_file:
-            file_hash = calculate_sha256(check_file.read())
-            st.code(f"SHA-256 Hash:\n{file_hash}", language="text")
-            st.caption("✨ *Recipients can verify this exact hash to guarantee zero tampering or malware infection.*")
+    locked_pdf_in = st.file_uploader("Upload Password-Locked PDF:", type=["pdf"], key="locked_pdf_up")
+    unlock_pw = st.text_input("Enter the Document Password:", type="password", key="unlock_pw_in")
+    
+    if st.button("🔓 Unlock & Remove Password", type="primary"):
+        if not locked_pdf_in or not unlock_pw:
+            st.warning("⚠️ Please provide both the locked PDF and the password!")
+        else:
+            try:
+                unlocked_bytes = unlock_pdf(locked_pdf_in.read(), unlock_pw)
+                st.success("🎉 Successfully unlocked! Password protection removed.")
+                st.download_button(
+                    label="⬇️ Download Unlocked PDF",
+                    data=unlocked_bytes,
+                    file_name=f"{os.path.splitext(locked_pdf_in.name)[0]}_unlocked.pdf",
+                    mime="application/pdf"
+                )
+            except Exception:
+                st.error("❌ Failed to unlock! The password was incorrect.")
+
+# ----------------- TAB 4: Privacy Shield -----------------
+with tab4:
+    st.markdown("### 🛡️ Enterprise Privacy Shield")
+    
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown("#### 1. SHA-256 Digital Fingerprint")
+        st.write("Calculate a tamper-proof cryptographic fingerprint of any document:")
+        hash_file = st.file_uploader("Upload File to Hash:", key="hash_f_in")
+        if hash_file:
+            h = calculate_sha256(hash_file.read())
+            st.code(f"SHA-256 Hash:\n{h}", language="text")
+            st.caption("✨ *Recipients can verify this exact checksum to guarantee the file was not tampered with.*")
             
-    with col_p2:
-        st.markdown("#### 2. Live PII Auto-Masking Test")
-        st.write("Test our auto-redaction engine that scrubs identity data:")
-        sample_text = st.text_area(
-            "Sample Document Text:",
-            "Customer John Doe, Contact: +91 9876543210, Email: john@company.com, Aadhaar: 1234 5678 9012"
+    with col_b:
+        st.markdown("#### 2. Live PII Masking Engine")
+        st.write("Test our on-device privacy filter that automatically scrubs personal identity info:")
+        sample_in = st.text_area(
+            "Enter Document Text:",
+            "Invoice for Customer Rajesh, Phone: +91 9876543210, Email: rajesh@example.com, Aadhaar: 9876 5432 1098"
         )
-        if st.button("🛡️ Run Privacy Cloak"):
-            clean_text = redact_sensitive_text(sample_text)
-            st.success("✅ Sensitive Information Masked:")
-            st.code(clean_text, language="text")
+        if st.button("🛡️ Redact Personal Information"):
+            cleaned = redact_sensitive_text(sample_in)
+            st.success("✅ Masked Content:")
+            st.code(cleaned, language="text")
